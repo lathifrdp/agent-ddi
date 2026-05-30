@@ -4,7 +4,7 @@ from google import genai
 from dotenv import load_dotenv
 
 # Pastikan Anda telah menginstal dependensi:
-# pip install google-genai numpy python-dotenv
+# pip3 install google-genai numpy python-dotenv
 
 def cosine_similarity(a, b):
     """Menghitung cosine similarity antara dua vektor."""
@@ -26,7 +26,7 @@ def load_and_chunk_document(file_path):
 def get_embeddings(client, texts):
     """Mendapatkan embeddings untuk daftar teks menggunakan model Gemini."""
     response = client.models.embed_content(
-        model='text-embedding-004',
+        model='gemini-embedding-2',
         contents=texts,
     )
     # Mengambil nilai vektor (values) dari setiap embedding
@@ -63,16 +63,18 @@ def main():
 
     # 2. Menentukan System Instruction
     system_instruction = (
-        "Anda adalah asisten AI dari perusahaan DDI (Data Dynamics Indonesia) yang sangat cerdas. "
-        "Gunakan informasi dari 'Konteks Dokumen' yang diberikan dalam prompt untuk menjawab pertanyaan secara akurat. "
-        "Jika jawabannya tidak ada di dalam konteks tersebut, Anda boleh menggunakan pengetahuan Anda sendiri, "
-        "namun beri tahu pengguna bahwa informasi tersebut di luar dokumen resmi yang diberikan. "
-        "Jawab dengan ramah, profesional, dan selalu gunakan bahasa Indonesia."
+        "Anda adalah asisten AI dari perusahaan DDI (Data Dynamics Indonesia) yang ramah dan cerdas. "
+        "Anda sedang berinteraksi dalam sebuah percakapan, jadi ingatlah selalu identitas pengguna dan histori chat sebelumnya. "
+        "Pada setiap pesan pengguna, sistem mungkin akan menyertakan 'Konteks Tambahan' dari dokumen. "
+        "Gunakan konteks tambahan tersebut HANYA JIKA relevan untuk menjawab pertanyaan tentang DDI. "
+        "Jika pengguna menanyakan hal di luar konteks dokumen (misalnya tentang diri mereka, atau obrolan santai), "
+        "jawablah secara natural berdasarkan histori percakapan atau pengetahuan umum Anda, tanpa perlu menyebutkan "
+        "bahwa itu di luar dokumen resmi (kecuali jika benar-benar ditanya tentang fakta spesifik perusahaan)."
     )
 
     # Inisialisasi sesi Gemini Chat
     chat = client.chats.create(
-        model="gemini-2.5-flash",
+        model="gemini-3.5-flash",
         config={
             "system_instruction": system_instruction,
             "temperature": 0.5
@@ -99,7 +101,7 @@ def main():
             # --- LANGKAH RAG (Retrieval) ---
             # Embed pertanyaan pengguna
             query_embed_response = client.models.embed_content(
-                model='text-embedding-004',
+                model='gemini-embedding-2',
                 contents=user_input,
             )
             query_embedding = query_embed_response.embeddings[0].values
@@ -119,13 +121,13 @@ def main():
             # --- LANGKAH AUGMENTASI PROMPT ---
             if retrieved_context:
                 augmented_prompt = (
-                    f"Konteks Dokumen:\n{retrieved_context}\n\n"
-                    f"Pertanyaan Pengguna:\n{user_input}"
+                    f"[Konteks Tambahan (hanya gunakan jika relevan dengan pertanyaan): {retrieved_context}]\n\n"
+                    f"{user_input}"
                 )
-                print(f"[Info RAG: Menemukan {len(retrieved_chunks)} bagian dokumen yang relevan]")
+                print(f"[Info RAG: Menemukan {len(retrieved_chunks)} bagian dokumen yang mungkin relevan]")
             else:
                 augmented_prompt = user_input
-                print("[Info RAG: Tidak ada bagian dokumen yang cukup relevan, menggunakan pengetahuan umum]")
+                print("[Info RAG: Tidak ada dokumen spesifik yang disisipkan untuk pertanyaan ini]")
 
             # --- LANGKAH GENERATION ---
             # Kirim pesan (yang sudah diaugmentasi konteks) ke Gemini Chat
