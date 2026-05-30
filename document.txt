@@ -1,0 +1,7 @@
+Sejarah Singkat Perusahaan DDI (Data Dynamics Indonesia):
+
+DDI didirikan pada tahun 2010 oleh sekelompok insinyur perangkat lunak yang berdedikasi untuk menciptakan solusi data enterprise. Pada awalnya perusahaan ini hanya fokus pada manajemen basis data skala kecil untuk bisnis ritel di Jakarta.
+
+Pada tahun 2015, DDI meluncurkan produk andalannya yaitu "DataStream Pro", sebuah platform analitik real-time yang mampu memproses jutaan transaksi per detik. Kesuksesan produk ini membawa DDI berekspansi ke pasar Asia Tenggara pada tahun 2018.
+
+Saat ini, di tahun 2026, DDI berfokus pada integrasi Artificial Intelligence dan Machine Learning ke dalam ekosistem produk mereka, membantu ribuan perusahaan melakukan otomasi pintar dan prediksi pasar yang presisi. Budaya kerja di DDI mengedepankan inovasi berkelanjutan, kolaborasi, dan keseimbangan kehidupan kerja (work-life balance).
