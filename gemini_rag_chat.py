@@ -1,4 +1,6 @@
 import os
+import re
+import time
 import numpy as np
 from google import genai
 from dotenv import load_dotenv
@@ -15,13 +17,13 @@ def cosine_similarity(a, b):
     return np.dot(a, b) / (norm_a * norm_b)
 
 def load_and_chunk_document(file_path):
-    """Membaca dokumen dan memecahnya menjadi paragraf (chunks)."""
+    """Membaca dokumen dan memecahnya menjadi bagian (chunks) berdasarkan heading markdown."""
     with open(file_path, 'r', encoding='utf-8') as f:
         text = f.read()
     
-    # Memecah berdasarkan baris kosong (paragraf)
-    paragraphs = [p.strip() for p in text.split('\n\n') if p.strip()]
-    return paragraphs
+    # Memecah berdasarkan heading markdown (## atau ###) agar konteks section tetap utuh
+    chunks = re.split(r'\n(?=#{2,3} )', text)
+    return [c.strip() for c in chunks if c.strip()]
 
 def get_embeddings(client, texts):
     """Mendapatkan embeddings untuk daftar teks menggunakan model Gemini."""
@@ -48,10 +50,10 @@ def main():
     print("Menginisialisasi RAG (Retrieval-Augmented Generation)...")
     
     # 1. Menyiapkan Dokumen Konteks
-    doc_path = "document.txt"
+    doc_path = "doc-context.md"
     if not os.path.exists(doc_path):
         print(f"Error: File {doc_path} tidak ditemukan.")
-        print("Harap buat file 'document.txt' terlebih dahulu di folder yang sama.")
+        print("Harap buat file 'doc-context.md' terlebih dahulu di folder yang sama.")
         return
         
     chunks = load_and_chunk_document(doc_path)
@@ -63,18 +65,19 @@ def main():
 
     # 2. Menentukan System Instruction
     system_instruction = (
-        "Anda adalah asisten AI dari perusahaan DDI (Data Dynamics Indonesia) yang ramah dan cerdas. "
+        "Anda adalah asisten AI yang ramah dan cerdas. "
         "Anda sedang berinteraksi dalam sebuah percakapan, jadi ingatlah selalu identitas pengguna dan histori chat sebelumnya. "
-        "Pada setiap pesan pengguna, sistem mungkin akan menyertakan 'Konteks Tambahan' dari dokumen. "
-        "Gunakan konteks tambahan tersebut HANYA JIKA relevan untuk menjawab pertanyaan tentang DDI. "
+        "Pada setiap pesan pengguna, sistem mungkin akan menyertakan 'Konteks Tambahan' dari dokumen panduan PortrAI CMS. "
+        "Gunakan konteks tambahan tersebut HANYA JIKA relevan untuk menjawab pertanyaan tentang sistem PortrAI CMS atau DDI. "
         "Jika pengguna menanyakan hal di luar konteks dokumen (misalnya tentang diri mereka, atau obrolan santai), "
         "jawablah secara natural berdasarkan histori percakapan atau pengetahuan umum Anda, tanpa perlu menyebutkan "
-        "bahwa itu di luar dokumen resmi (kecuali jika benar-benar ditanya tentang fakta spesifik perusahaan)."
+        "bahwa itu di luar dokumen resmi (kecuali jika benar-benar ditanya tentang fakta spesifik perusahaan),"
+        "jawab dengan optimasi yang baik agar tidak terlalu panjang."
     )
 
     # Inisialisasi sesi Gemini Chat
     chat = client.chats.create(
-        model="gemini-3.5-flash",
+        model="gemini-2.5-flash",
         config={
             "system_instruction": system_instruction,
             "temperature": 0.5
@@ -130,9 +133,24 @@ def main():
                 print("[Info RAG: Tidak ada dokumen spesifik yang disisipkan untuk pertanyaan ini]")
 
             # --- LANGKAH GENERATION ---
-            # Kirim pesan (yang sudah diaugmentasi konteks) ke Gemini Chat
-            response = chat.send_message(augmented_prompt)
-            print(f"Gemini: {response.text}")
+            # Kirim pesan (yang sudah diaugmentasi konteks) ke Gemini Chat dengan mekanisme Retry
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    response = chat.send_message(augmented_prompt)
+                    print(f"Gemini: {response.text}")
+                    break # Berhasil, keluar dari loop retry
+                except Exception as e:
+                    error_msg = str(e)
+                    if "503" in error_msg or "500" in error_msg or "UNAVAILABLE" in error_msg:
+                        if attempt < max_retries - 1:
+                            print(f"[Server Google sedang sibuk, mencoba ulang dalam 3 detik... (Percobaan {attempt+1}/{max_retries})]")
+                            time.sleep(3)
+                        else:
+                            print("Maaf, server Google masih sibuk setelah beberapa kali percobaan. Silakan coba lagi nanti.")
+                    else:
+                        print(f"Terjadi kesalahan saat memproses permintaan: {e}")
+                        break # Error lain, hentikan retry
             
         except KeyboardInterrupt:
             print("\nChatbot dimatikan paksa. Sampai jumpa!")
